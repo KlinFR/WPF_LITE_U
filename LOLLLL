@@ -1,0 +1,42 @@
+SQL-запросы к базе данных "Праздник всем":
+1. Список клиентов с данными о заказе и суммой к оплате:
+SELECT
+    c.ClientID,
+    c.LastName,
+    c.FirstName,
+    o.OrderID,
+    o.OrderDate,
+    SUM(oi.Quantity * p.Price) AS TotalOrderAmount
+FROM Clients c
+LEFT JOIN Orders o ON c.ClientID = o.ClientID
+LEFT JOIN OrderItems oi ON o.OrderID = oi.OrderID
+LEFT JOIN Products p ON oi.ProductID = p.ProductID
+GROUP BY 
+    c.ClientID, c.LastName, c.FirstName, o.OrderID, o.OrderDate
+ORDER BY
+    c.ClientID, o.OrderID;
+Use code with caution.
+SQL
+Объяснение:
+Используем LEFT JOIN, чтобы включить в результат всех клиентов, даже если у них нет заказов.
+SUM(oi.Quantity * p.Price) вычисляет сумму к оплате для каждой позиции в заказе.
+GROUP BY группирует результаты по клиенту и заказу.
+ORDER BY сортирует результаты по ID клиента и номеру заказа.
+2. Удаление не заказанных товаров и услуг:
+DELETE FROM Products
+WHERE ProductID NOT IN (SELECT DISTINCT ProductID FROM OrderItems);
+Use code with caution.
+SQL
+Объяснение:
+NOT IN используется для выбора товаров, которых нет в подзапросе.
+Подзапрос SELECT DISTINCT ProductID FROM OrderItems выбирает все уникальные ID товаров, которые были заказаны.
+DELETE удаляет строки из таблицы Products, соответствующие условию WHERE.
+3. Обновление цен на товары без изображения:
+UPDATE Products
+SET Price = Price * 0.85 -- Уменьшаем цену на 15%
+WHERE Image IS NULL;
+Use code with caution.
+SQL
+Объяснение:
+WHERE Image IS NULL выбирает товары, у которых столбец Image содержит значение NULL (т.е. нет изображения).
+SET Price = Price * 0.85 обновляет цену, умножая ее на 0.85 (что эквивалентно уменьшению на 15%).
