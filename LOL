@@ -1,0 +1,107 @@
+-- Создание таблицы Clients
+CREATE TABLE Clients (
+    ClientID INT PRIMARY KEY IDENTITY(1,1),
+    LastName VARCHAR(255) NOT NULL,
+    FirstName VARCHAR(255) NOT NULL,
+    MiddleName VARCHAR(255),
+    Phone VARCHAR(20) NOT NULL,
+    Email VARCHAR(255),
+    PromoRegistered BIT DEFAULT 0
+);
+GO
+
+-- Создание таблицы Employees
+CREATE TABLE Employees (
+    EmployeeID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    LastName VARCHAR(255) NOT NULL,
+    FirstName VARCHAR(255) NOT NULL,
+    MiddleName VARCHAR(255),
+    BirthDate DATE,
+    Phone VARCHAR(20) NOT NULL,
+    City VARCHAR(255) NOT NULL,
+    Street VARCHAR(255) NOT NULL,
+    HouseNumber VARCHAR(10) NOT NULL,
+    ApartmentNumber VARCHAR(10)
+);
+GO
+
+-- Создание таблицы Products
+CREATE TABLE Products (
+    ProductID INT PRIMARY KEY IDENTITY(1,1),
+    ProductName VARCHAR(255) NOT NULL,
+    Description VARCHAR(MAX),
+    Price DECIMAL(10,2) NOT NULL,
+    Image VARBINARY(MAX)
+);
+GO
+
+-- Создание таблицы Orders
+CREATE TABLE Orders (
+    OrderID INT PRIMARY KEY IDENTITY(1,1),
+    ClientID INT NOT NULL,
+    EmployeeID UNIQUEIDENTIFIER,
+    OrderDate DATE NOT NULL,
+    PaymentMethod VARCHAR(50) NOT NULL,
+    Status VARCHAR(50) NOT NULL,
+    FOREIGN KEY (ClientID) REFERENCES Clients(ClientID),
+    FOREIGN KEY (EmployeeID) REFERENCES Employees(EmployeeID)
+);
+GO
+
+-- Создание таблицы OrderItems
+CREATE TABLE OrderItems (
+    OrderItemID INT PRIMARY KEY IDENTITY(1,1),
+    OrderID INT NOT NULL,
+    ProductID INT NOT NULL,
+    Quantity INT NOT NULL,
+    FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
+    FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+);
+GO
+
+-- Создание таблицы HistoryCost
+CREATE TABLE HistoryCost (
+    HistoryCostID INT PRIMARY KEY IDENTITY(1,1),
+    ChangeDate DATETIME DEFAULT GETDATE() NOT NULL,
+    ProductID INT NOT NULL,
+    OldPrice DECIMAL(10,2) NOT NULL,
+    NewPrice DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+);
+GO
+
+-- Создание процедуры dbo.ValidateEmails
+CREATE PROCEDURE dbo.ValidateEmails 
+AS
+BEGIN
+  SELECT 
+    Email,
+    CASE 
+      WHEN Email LIKE '%[^a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+%' OR
+           Email NOT LIKE '%_@_%_.__%' OR 
+           Email LIKE '%.[.]%'
+      THEN 0 
+      ELSE 1 
+    END AS IsValid
+  FROM Clients;
+END;
+GO
+
+-- Создание триггера trg_ProductPriceUpdate
+CREATE TRIGGER trg_ProductPriceUpdate
+ON Products
+AFTER UPDATE
+AS
+BEGIN
+  IF UPDATE(Price)
+  BEGIN
+    INSERT INTO HistoryCost (ProductID, OldPrice, NewPrice)
+    SELECT 
+      d.ProductID,
+      d.Price,
+      i.Price
+    FROM DELETED d
+    JOIN INSERTED i ON d.ProductID = i.ProductID;
+  END;
+END;
+GO
