@@ -1,3 +1,93 @@
+Структура базы данных:
+1. Таблица Clients (Клиенты):
+ClientID INT PRIMARY KEY IDENTITY(1,1) -- ID клиента (автоинкремент)
+LastName VARCHAR(255) NOT NULL -- Фамилия
+FirstName VARCHAR(255) NOT NULL -- Имя
+MiddleName VARCHAR(255) -- Отчество (необязательно)
+Phone VARCHAR(20) NOT NULL -- Телефон
+Email VARCHAR(255) -- Email (необязательно)
+PromoRegistered BIT DEFAULT 0 -- Участие в промо-акции (0 - нет, 1 - да)
+2. Таблица Employees (Сотрудники):
+EmployeeID UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID() -- Уникальный ID сотрудника (GUID)
+LastName VARCHAR(255) NOT NULL -- Фамилия
+FirstName VARCHAR(255) NOT NULL -- Имя
+MiddleName VARCHAR(255) -- Отчество (необязательно)
+BirthDate DATE -- Дата рождения
+Phone VARCHAR(20) NOT NULL -- Телефон
+City VARCHAR(255) NOT NULL -- Город
+Street VARCHAR(255) NOT NULL -- Улица
+HouseNumber VARCHAR(10) NOT NULL -- Номер дома
+ApartmentNumber VARCHAR(10) -- Номер квартиры (необязательно)
+3. Таблица Products (Товары/Услуги):
+ProductID INT PRIMARY KEY IDENTITY(1,1) -- ID товара/услуги (автоинкремент)
+ProductName VARCHAR(255) NOT NULL -- Наименование
+Description VARCHAR(MAX) -- Описание
+Price DECIMAL(10,2) NOT NULL -- Цена
+Image VARBINARY(MAX) -- Изображение (необязательно)
+4. Таблица Orders (Заказы):
+OrderID INT PRIMARY KEY IDENTITY(1,1) -- ID заказа (автоинкремент)
+ClientID INT NOT NULL -- ID клиента (внешний ключ)
+EmployeeID UNIQUEIDENTIFIER -- ID сотрудника (внешний ключ)
+OrderDate DATE NOT NULL -- Дата заказа
+PaymentMethod VARCHAR(50) NOT NULL -- Способ оплаты
+Status VARCHAR(50) NOT NULL -- Статус заказа ("Создан", "В работе", "Выполнен")
+FOREIGN KEY (ClientID) REFERENCES Clients(ClientID),
+FOREIGN KEY (EmployeeID) REFERENCES Employees(EmployeeID)
+5. Таблица OrderItems (Состав заказа):
+OrderItemID INT PRIMARY KEY IDENTITY(1,1) -- ID позиции в заказе (автоинкремент)
+OrderID INT NOT NULL -- ID заказа (внешний ключ)
+ProductID INT NOT NULL -- ID товара/услуги (внешний ключ)
+Quantity INT NOT NULL -- Количество
+FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
+FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+6. Таблица HistoryCost (История цен):
+HistoryCostID INT PRIMARY KEY IDENTITY(1,1) -- ID записи в истории цен
+ChangeDate DATETIME DEFAULT GETDATE() NOT NULL -- Дата изменения цены (по умолчанию текущее время)
+ProductID INT NOT NULL -- ID товара/услуги (внешний ключ)
+OldPrice DECIMAL(10,2) NOT NULL -- Старое значение цены
+NewPrice DECIMAL(10,2) NOT NULL -- Новое значение цены
+FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+Процедура для проверки email:
+CREATE PROCEDURE dbo.ValidateEmails 
+AS
+BEGIN
+  SELECT 
+    Email,
+    CASE 
+      WHEN Email LIKE '%[^a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+%' OR
+           Email NOT LIKE '%_@_%_.__%' OR 
+           Email LIKE '%.[.]%'
+      THEN 0 -- Невалидный email
+      ELSE 1 -- Валидный email
+    END AS IsValid
+  FROM Clients;
+END;
+GO
+Use code with caution.
+SQL
+Триггер для записи истории цен:
+CREATE TRIGGER trg_ProductPriceUpdate
+ON Products
+AFTER UPDATE
+AS
+BEGIN
+  IF UPDATE(Price)
+  BEGIN
+    INSERT INTO HistoryCost (ProductID, OldPrice, NewPrice)
+    SELECT 
+      d.ProductID,
+      d.Price,
+      i.Price
+    FROM DELETED d
+    JOIN INSERTED i ON d.ProductID = i.ProductID;
+  END;
+END;
+GO
+
+
+
+
+
 -- Создание таблицы Clients
 CREATE TABLE Clients (
     ClientID INT PRIMARY KEY IDENTITY(1,1),
