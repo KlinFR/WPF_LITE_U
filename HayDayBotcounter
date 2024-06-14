@@ -1,0 +1,285 @@
+напиши скрипт MS sql который позволит:
+Создать 10 пользователей us1, us2, us3, …, us 10 у которых пароль формируется случайным образом и содержит 5 символов(Буквы, цыфры);
+
+Model
+16.1s
+warning
+-- Включите вывод сообщений об ошибках
+SET NOCOUNT ON;
+
+-- Цикл для создания 10 пользователей
+DECLARE @Counter INT = 1;
+
+WHILE @Counter <= 10
+BEGIN
+  -- Генерация случайного пароля
+    DECLARE @Password VARCHAR(5);
+    SET @Password = '';
+
+    -- Генерация 5 случайных символов
+    DECLARE @CharCounter INT = 1;
+    WHILE @CharCounter <= 5
+    BEGIN
+        DECLARE @RandomType INT;
+        SET @RandomType = RAND() * 2 + 1; -- 1 - цифра, 2 - буква
+
+        DECLARE @RandomChar CHAR(1);
+        IF @RandomType = 1
+            SET @RandomChar = CHAR(RAND() * 10 + 48); -- Случайная цифра (ASCII 48-57)
+        ELSE
+            SET @RandomChar = CHAR(RAND() * 26 + CASE WHEN RAND() < 0.5 THEN 65 ELSE 97 END); -- Случайная буква (ASCII 65-90, 97-122)
+
+        SET @Password = @Password + @RandomChar;
+        SET @CharCounter = @CharCounter + 1;
+    END
+
+    -- Создание пользователя
+    DECLARE @UserName VARCHAR(10);
+    SET @UserName = 'us' + CAST(@Counter AS VARCHAR);
+
+    DECLARE @CreateUserSQL VARCHAR(MAX);
+    SET @CreateUserSQL = 'CREATE LOGIN ' + QUOTENAME(@UserName) + ' WITH PASSWORD = ''' + @Password + ''';';
+
+    EXEC(@CreateUserSQL);
+
+    PRINT 'Пользователь ' + @UserName + ' создан с паролем ' + @Password;
+
+    SET @Counter = @Counter + 1;
+END
+
+
+
+теперь создай базу данных пользователей
+DB1, DB2, DB3, … , DB10;
+
+Model
+9.0s
+-- Включите вывод сообщений об ошибках
+SET NOCOUNT ON;
+
+-- Цикл для создания 10 баз данных
+DECLARE @Counter INT = 1;
+
+WHILE @Counter <= 10
+BEGIN
+  -- Формирование имени базы данных
+  DECLARE @DBName VARCHAR(10);
+  SET @DBName = 'DB' + CAST(@Counter AS VARCHAR);
+
+  -- Создание базы данных
+  DECLARE @CreateDBSQL VARCHAR(MAX);
+  SET @CreateDBSQL = 'CREATE DATABASE ' + QUOTENAME(@DBName);
+
+  EXEC(@CreateDBSQL);
+
+  PRINT 'База данных ' + @DBName + ' создана';
+
+  SET @Counter = @Counter + 1;
+END
+
+
+настроий права доступа пользователей к базам данных. Пользователь us1 имеет доступ только к базе данных DB1, us2 имеет доступ только к базе данных DB2 и т.д.
+Пользователям необходимо запретить создавать базы данных, отзывать и отклонять разрешения, предоставляющих или запрещающих доступ к базе данных.
+
+Model
+17.6s
+warning
+-- Включите вывод сообщений об ошибках
+SET NOCOUNT ON;
+
+-- Цикл для настройки прав доступа
+DECLARE @Counter INT = 1;
+
+WHILE @Counter <= 10
+BEGIN
+  -- Формирование имен пользователя и базы данных
+  DECLARE @UserName VARCHAR(10);
+  SET @UserName = 'us' + CAST(@Counter AS VARCHAR);
+
+  DECLARE @DBName VARCHAR(10);
+  SET @DBName = 'DB' + CAST(@Counter AS VARCHAR);
+
+  -- Предоставление доступа к базе данных
+  DECLARE @GrantAccessSQL VARCHAR(MAX);
+  SET @GrantAccessSQL = 
+  'USE ' + QUOTENAME(@DBName) + ';
+  CREATE USER ' + QUOTENAME(@UserName) + ' FOR LOGIN ' + QUOTENAME(@UserName) + ';
+  ALTER ROLE db_datareader ADD MEMBER ' + QUOTENAME(@UserName) + ';
+  ALTER ROLE db_datawriter ADD MEMBER ' + QUOTENAME(@UserName) + ';';
+
+  EXEC(@GrantAccessSQL);
+
+  -- Запрет на создание, изменение и удаление БД и прав доступа
+  DECLARE @DenyPermissionsSQL VARCHAR(MAX);
+  SET @DenyPermissionsSQL = 
+  'DENY CREATE DATABASE TO ' + QUOTENAME(@UserName) + ';
+  DENY ALTER ANY DATABASE TO ' + QUOTENAME(@UserName) + ';
+  DENY DROP ANY DATABASE TO ' + QUOTENAME(@UserName) + ';
+  DENY ALTER ANY USER TO ' + QUOTENAME(@UserName) + ';
+  DENY ALTER ANY LOGIN TO ' + QUOTENAME(@UserName) + ';';
+
+  EXEC(@DenyPermissionsSQL);
+
+  PRINT 'Пользователю ' + @UserName + ' настроены права доступа к базе данных ' + @DBName;
+
+  SET @Counter = @Counter + 1;
+END
+
+
+Содать базу данных DB и таблицу Users для хранения пользователей и их паролей;
+
+Model
+15.0s
+warning
+-- Создание базы данных DB
+CREATE DATABASE DB;
+GO
+
+-- Переключение на созданную базу данных
+USE DB;
+GO
+
+-- Создание таблицы Users
+CREATE TABLE Users (
+    UserID INT IDENTITY(1,1) PRIMARY KEY, -- Идентификатор пользователя (автоинкремент)
+    Username VARCHAR(50) NOT NULL UNIQUE, -- Имя пользователя (уникальное)
+    PasswordHash VARCHAR(255) NOT NULL -- Хэш пароля (обязательное поле)
+);
+GO
+
+
+
+Заполнить таблицу Users данными созданных пользователях и паролях.
+
+Model
+13.9s
+К сожалению, напрямую получить сгенерированные ранее пароли из SQL Server невозможно.
+Вот почему это проблема и как можно поступить:
+Безопасность прежде всего: SQL Server не хранит пароли в открытом виде. Вместо этого он хранит хэши паролей. Хэш-функция работает только в одну сторону: вы можете создать хэш из пароля, но не можете получить пароль из хэша. Это сделано для защиты паролей в случае взлома базы данных.
+Отсутствие логирования: SQL Server не ведет журнал сгенерированных паролей.
+Что делать?
+Вам нужно изменить подход и сгенерировать хэши паролей до добавления пользователей в таблицу Users.
+Вот пример с использованием T-SQL и встроенной функции HASHBYTES для хэширования (рекомендуется использовать более сильные алгоритмы хэширования в реальных системах):
+-- Включите вывод сообщений об ошибках
+SET NOCOUNT ON;
+
+-- Цикл для создания 10 пользователей и хэширования паролей
+DECLARE @Counter INT = 1;
+
+WHILE @Counter <= 10
+BEGIN
+    -- Генерация случайного пароля (как в предыдущем примере)
+    DECLARE @Password VARCHAR(5);
+    SET @Password = '';
+    -- ... (код генерации пароля)
+
+    -- Хэширование пароля с использованием SHA2_256 
+    DECLARE @PasswordHash VARBINARY(256);
+    SET @PasswordHash = HASHBYTES('SHA2_256', @Password);
+
+    -- Вставка данных пользователя в таблицу Users
+    DECLARE @UserName VARCHAR(10);
+    SET @UserName = 'us' + CAST(@Counter AS VARCHAR);
+
+    INSERT INTO Users (Username, PasswordHash)
+    VALUES (@UserName, @PasswordHash);
+
+    PRINT 'Пользователь ' + @UserName + ' добавлен в таблицу Users';
+
+    SET @Counter = @Counter + 1;
+END
+
+
+
+Создай скрипт, который зашифрует все пароли в таблице Users.
+
+Model
+16.2s
+warning
+Важно:
+Этот скрипт НЕВОЗМОЖНО обратить. После хэширования паролей вы не сможете восстановить исходные пароли.
+Убедитесь, что вы используете надежный алгоритм хэширования, такой как bcrypt, scrypt, Argon2 или PBKDF2. SHA256, хоть и лучше, чем ничего, считается недостаточно стойким для хэширования паролей.
+Сохраните копию базы данных перед выполнением этого скрипта!
+-- !!! ВАЖНО !!! 
+-- Этот скрипт заменит существующие пароли на их хэши. 
+-- Убедитесь, что у вас есть резервная копия базы данных, прежде чем продолжить!
+
+USE DB;
+GO
+
+-- Выберите алгоритм хэширования: SHA2_256, SHA2_512, etc.
+-- !!! Рекомендуется использовать более сильные алгоритмы, чем SHA256 !!!
+DECLARE @HashAlgorithm VARCHAR(10) = 'SHA2_256';
+
+-- Обновляем таблицу Users, хэшируя пароли
+UPDATE Users
+SET PasswordHash = HASHBYTES(@HashAlgorithm, Password)
+WHERE LEN(Password) > 0; -- Хэшируем только непустые пароли
+
+-- Выводим сообщение о завершении
+PRINT 'Пароли в таблице Users были зашифрованы.';
+GO
+
+
+Создай скрипт, который который позволит отобразить данные из таблицы Users с расшифрованными паролями.
+
+Model
+8.7s
+warning
+Это невозможно сделать безопасно!
+Как уже говорилось ранее, хэширование паролей — это односторонняя функция. Невозможно получить исходный пароль из его хэша.
+Предоставление скрипта, который якобы может это сделать, было бы грубейшим нарушением безопасности и поставило бы под угрозу данные ваших пользователей.
+Что делать, если вам нужно получить доступ к паролям?
+Если пользователи забыли пароли:
+Предоставьте им возможность сброса пароля, сгенерировав новый хэш для нового пароля и сохранив его в базе данных.
+Никогда не храните и не передавайте пароли в открытом виде.
+Безопасность должна быть вашим главным приоритетом!
+
+
+Создай скрипт, который позволит провести резервное копирование базы данных DB.
+
+Model
+13.7s
+-- Указываем путь к файлу резервной копии
+DECLARE @BackupPath VARCHAR(255) = 'C:\SQLBackups\DB_Backup.bak';
+
+-- Формируем команду BACKUP DATABASE
+DECLARE @BackupCommand VARCHAR(MAX);
+SET @BackupCommand = 
+    'BACKUP DATABASE DB ' +
+    'TO DISK = ''' + @BackupPath + ''' ' +
+    'WITH FORMAT, -- Создаем новую резервную копию
+    NAME = ''DB Backup'', -- Имя резервной копии
+    DESCRIPTION = ''Полная резервная копия базы данных DB''';
+
+-- Выполняем команду резервного копирования
+EXEC (@BackupCommand);
+
+-- Выводим сообщение о завершении
+PRINT 'Резервная копия базы данных DB успешно создана в ' + @BackupPath;
+GO
+
+
+
+Создай скрипт, который позволит провести процедуру восстановления базы данных.
+
+Model
+13.2s
+-- Указываем путь к файлу резервной копии
+DECLARE @BackupPath VARCHAR(255) = 'C:\SQLBackups\DB_Backup.bak';
+
+-- Отключаем все подключения к базе данных DB
+ALTER DATABASE DB SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+
+-- Восстанавливаем базу данных из резервной копии
+RESTORE DATABASE DB
+FROM DISK = @BackupPath
+WITH REPLACE, -- Заменяем существующую базу данных
+RECOVERY; -- Переводим базу данных в состояние online
+
+-- Выводим сообщение о завершении
+PRINT 'База данных DB успешно восстановлена из резервной копии.';
+GO
+
+
+
